@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Scanner LEGO en Direct</title>
+<style>
+    body {
+        margin: 0;
+        background: black;
+        overflow: hidden;
+        font-family: Arial;
+        color: white;
+    }
+
+    #video {
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        background: black;
+    }
+
+    #scanLine {
+        position: absolute;
+        width: 100%;
+        height: 4px;
+        background: red;
+        animation: scan 2s linear infinite;
+        mix-blend-mode: screen;
+    }
+
+    @keyframes scan {
+        0% { top: 0; }
+        100% { top: calc(100% - 4px); }
+    }
+
+    #result {
+        position: absolute;
+        bottom: 25px;
+        width: 100%;
+        text-align: center;
+        font-size: 30px;
+        font-weight: bold;
+        text-shadow: 0 0 10px black;
+    }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline muted></video>
+<div id="scanLine"></div>
+<div id="result">Chargement caméra…</div>
+
+<script>
+// 🚀 Démarrage de la caméra
+async function startCam() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+            audio: false
+        });
+
+        const video = document.getElementById("video");
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+            video.play();
+            analyserEnDirect();
+            document.getElementById("result").textContent = "Scanner prêt";
+        };
+
+    } catch (err) {
+        document.getElementById("result").textContent =
+            "❌ Caméra inaccessible (site HTTPS obligatoire)";
+    }
+}
+
+startCam();
+
+
+// 🚀 Analyse intelligente en direct
+function analyserEnDirect() {
+    const video = document.getElementById("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const result = document.getElementById("result");
+
+    function loop() {
+        if (video.videoWidth === 0) {
+            requestAnimationFrame(loop);
+            return;
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        ctx.drawImage(video, 0, 0);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+        // Compteurs
+        let bleuFonce = 0;
+        let rougeLogo = 0;
+        let jauneLogo = 0;
+
+        // Analyse tous les 10 pixels
+        for (let y = 0; y < canvas.height; y += 10) {
+            for (let x = 0; x < canvas.width; x += 10) {
+
+                const i = (y * canvas.width + x) * 4;
+                const r = data[i], g = data[i+1], b = data[i+2];
+
+                // Détection du bleu foncé passeport LEGO
+                if (b > 90 && r < 70 && g < 80) bleuFonce++;
+
+                // Rouge logo LEGO
+                if (r > 150 && g < 90 && b < 90) rougeLogo++;
+
+                // Jaune logo LEGO
+                if (r > 170 && g > 150 && b < 90) jauneLogo++;
+            }
+        }
+
+        // Détection de la forme "livre"
+        let ratio = canvas.height / canvas.width;
+        let rectangleDetecte = ratio > 1.2;
+
+        // Conditions
+        let couleurPasseport = bleuFonce > 300;
+        let logoPossible = (rougeLogo > 40 && jauneLogo > 20);
+
+        // Score
+        let score = 0;
+        if (couleurPasseport) score++;
+        if (logoPossible) score++;
+        if (rectangleDetecte) score++;
+
+        if (score >= 2) {
+            result.style.color = "lime";
+            result.textContent = "✔ Passeport LEGO détecté !";
+        } else {
+            result.style.color = "red";
+            result.textContent = "❌ Faux passeport détecté";
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+}
+</script>
+
+</body>
+</html>
